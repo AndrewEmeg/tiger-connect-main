@@ -4,7 +4,16 @@ interface NotificationResponse {
     success: boolean;
     count?: number;
     error?: string;
-    data?: any;
+    data?: {
+        id?: string;
+        user_id?: string;
+        type?: string;
+        title?: string;
+        message?: string;
+        related_id?: string;
+        read?: boolean;
+        created_at?: string;
+    };
 }
 
 class SupabaseDbConnection {
@@ -14,8 +23,14 @@ class SupabaseDbConnection {
 
     constructor() {
         this.supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        this.supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY; // ✅ Updated to match your .env
-        this.supabase = createClient(this.supabaseUrl, this.supabaseKey);
+        this.supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        this.supabase = createClient(this.supabaseUrl, this.supabaseKey, {
+            auth: {
+                autoRefreshToken: true,
+                persistSession: true,
+                detectSessionInUrl: true,
+            },
+        });
     }
 
     public getClient(): SupabaseClient {
@@ -32,7 +47,7 @@ class SupabaseDbConnection {
             if (error) throw new Error(error.message);
 
             if ((await this.userExists(gnumber)).exists) {
-                await this.supabase.auth.api.deleteUser(data.user.id);
+                await this.supabase.auth.admin.deleteUser(data.user.id);
                 throw new Error("User already exists");
             }
 
@@ -49,7 +64,7 @@ class SupabaseDbConnection {
                 ]);
 
             if (insertError) {
-                await this.supabase.auth.api.deleteUser(data.user.id);
+                await this.supabase.auth.admin.deleteUser(data.user.id);
                 throw new Error(insertError.message);
             }
 
@@ -208,6 +223,23 @@ class SupabaseDbConnection {
         image
     ) {
         try {
+            // Get the current session
+            const {
+                data: { session },
+                error: sessionError,
+            } = await this.supabase.auth.getSession();
+
+            if (sessionError || !session) {
+                throw new Error("You must be logged in to create a service");
+            }
+
+            // Verify the provider ID matches the authenticated user
+            if (session.user.id !== providerId) {
+                throw new Error(
+                    "You can only create services for your own account"
+                );
+            }
+
             console.log("Starting service listing with parameters:", {
                 title: name,
                 provider_id: providerId,
@@ -249,7 +281,7 @@ class SupabaseDbConnection {
                         image: imageUrl.data[0],
                     },
                 ])
-                .select(); // Add .select() to return the inserted rows
+                .select();
 
             if (error) {
                 console.error("Error inserting service:", error.message);
@@ -259,7 +291,6 @@ class SupabaseDbConnection {
             console.log("Service listing successful, data:", data);
             return { success: true, data: data };
         } catch (error) {
-            return { success: false, error: error.message };
             console.error("Error in listServices:", error);
             return { success: false, error: error.message };
         }
@@ -816,6 +847,71 @@ class SupabaseDbConnection {
             providerMessage,
             bookingId
         );
+    }
+
+    async getUserOrders(userId: string) {
+        try {
+            const { data, error } = await this.supabase
+                .from("orders")
+                .select("*")
+                .eq("user_id", userId)
+                .order("created_at", { ascending: false });
+
+            if (error) throw new Error(error.message);
+            return { success: true, data };
+        } catch (error) {
+            console.error("Error fetching user orders:", error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getItemReviews(itemId: string, itemType: "product" | "service") {
+        try {
+            const { data, error } = await this.supabase
+                .from("reviews")
+                .select(
+                    `
+                    *,
+                    user:user_table!user_id (
+                        first_name,
+                        last_name,
+                        avatar
+                    )
+                `
+                )
+                .eq("item_id", itemId)
+                .eq("item_type", itemType)
+                .order("created_at", { ascending: false });
+
+            if (error) throw new Error(error.message);
+            return { success: true, data };
+        } catch (error) {
+            console.error("Error fetching item reviews:", error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async createReview(review: {
+        order_id: string;
+        user_id: string;
+        item_id: string;
+        item_type: "product" | "service";
+        rating: number;
+        comment?: string;
+    }) {
+        try {
+            const { data, error } = await this.supabase
+                .from("reviews")
+                .insert([review])
+                .select()
+                .single();
+
+            if (error) throw new Error(error.message);
+            return { success: true, data };
+        } catch (error) {
+            console.error("Error creating review:", error);
+            return { success: false, error: error.message };
+        }
     }
 }
 

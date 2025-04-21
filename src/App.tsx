@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { Elements } from "@stripe/react-stripe-js";
 import SellerOnboarding from "./pages/Onboarding";
+import AppRoutes from "./routes";
 
 // Pages
 import Home from "./pages/Home";
@@ -35,46 +36,21 @@ const queryClient = new QueryClient();
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 const App = () => (
-  <Elements stripe={stripePromise}>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <CartProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/marketplace" element={<Marketplace />} />
-                <Route path="/marketplace/new" element={<MarketplaceNew />} />
-                <Route path="/services" element={<Services />} />
-                <Route path="/services/new" element={<ServicesNew />} />
-                <Route path="/services/:id" element={<ServiceDetail />} />
-                <Route path="/events" element={<Events />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/search" element={<Search />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/verify" element={<VerifyAccount />} />
-                <Route path="/product/:id" element={<ProductDetail />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="/order-success" element={<OrderSuccess />} />
-                <Route path="/messages/:receiverId" element={<MessagesPage />} />
-                <Route path="/messages" element={<MessagesInbox />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="*" element={<NotFound />} />
-                <Route
-                  path="/onboarding"
-                  element={<SellerOnboarding />}
-                ></Route>
-              </Routes>
-            </BrowserRouter>
-          </CartProvider>
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
-  </Elements>
+    <BrowserRouter>
+        <Elements stripe={stripePromise}>
+            <QueryClientProvider client={queryClient}>
+                <TooltipProvider>
+                    <AuthProvider>
+                        <CartProvider>
+                            <Toaster />
+                            <Sonner />
+                            <AppRoutes />
+                        </CartProvider>
+                    </AuthProvider>
+                </TooltipProvider>
+            </QueryClientProvider>
+        </Elements>
+    </BrowserRouter>
 );
 
 export default App;

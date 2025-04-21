@@ -8,6 +8,7 @@ import { setUsers } from "@/models/User";
 import { User } from "@/models/User";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/components/ui/use-toast";
+import { Reviews } from "@/components/Reviews";
 
 interface Review {
     id: number;
@@ -142,10 +143,14 @@ const ProductDetail = () => {
                                 <p className="text-gray-600">
                                     {getSellerName(product.seller_id)}
                                 </p>
-                                <Button 
-                                    variant="link" 
+                                <Button
+                                    variant="link"
                                     className="text-grambling-gold p-0"
-                                    onClick={() => navigate(`/messages/${product.seller_id}`)}
+                                    onClick={() =>
+                                        navigate(
+                                            `/messages/${product.seller_id}`
+                                        )
+                                    }
                                 >
                                     Message Seller
                                 </Button>
@@ -200,35 +205,7 @@ const ProductDetail = () => {
             {/* Reviews Section */}
             <div className="mt-16">
                 <h2 className="text-2xl font-bold mb-6">Customer Reviews</h2>
-                <div className="space-y-6">
-                    {reviews.map((review) => (
-                        <Card key={review.id} className="p-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <h3 className="font-semibold">
-                                        {review.user}
-                                    </h3>
-                                    <p className="text-sm text-gray-500">
-                                        {review.date}
-                                    </p>
-                                </div>
-                                <div className="flex items-center">
-                                    {[...Array(5)].map((_, i) => (
-                                        <Star
-                                            key={i}
-                                            className={`h-5 w-5 ${
-                                                i < review.rating
-                                                    ? "text-yellow-400 fill-current"
-                                                    : "text-gray-300"
-                                            }`}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                            <p className="text-gray-600">{review.comment}</p>
-                        </Card>
-                    ))}
-                </div>
+                <Reviews itemId={id!} itemType="product" />
             </div>
         </div>
     );

@@ -301,7 +301,7 @@ export default function Checkout() {
 
                                     <div className="space-y-2">
                                         <Label>Card Details</Label>
-                                        <div className="border rounded-md p-2">
+                                        <div className="border rounded-md p-3 bg-white">
                                             <CardElement
                                                 options={{
                                                     style: {
@@ -311,6 +311,8 @@ export default function Checkout() {
                                                             "::placeholder": {
                                                                 color: "#aab7c4",
                                                             },
+                                                            backgroundColor:
+                                                                "white",
                                                         },
                                                         invalid: {
                                                             color: "#9e2146",
