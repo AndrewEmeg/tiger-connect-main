@@ -4,276 +4,268 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate, Link } from "react-router-dom";
 import {
-    Calendar,
-    ShoppingBag,
-    Briefcase,
-    MessageSquare,
-    Settings,
-    Star,
-    LogOut,
-    VerifiedIcon,
-    User,
-    Clock,
+  Calendar,
+  ShoppingBag,
+  Briefcase,
+  MessageSquare,
+  Settings,
+  Star,
+  LogOut,
+  VerifiedIcon,
+  User,
+  Clock,
+  Users,
+  Plus,
+  Building,
+  InfoIcon,
 } from "lucide-react";
 import { setListings, MarketplaceItem } from "@/models/Marketplace";
 import { Service, setServiceListings } from "@/models/Service";
 import { useEffect, useState } from "react";
 import OrderHistory from "@/components/OrderHistory";
+import { supabaseCon } from "@/db_api/connection";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { organizationTypeNames } from "@/models/Event";
+import {
+  Tabs,
+  TabsList,
+  TabsContent,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  AdminPendingOrganizations,
+  AdminPendingMembers,
+} from "@/components/admin-pending-organizations";
+import { Label } from "@/components/ui/label";
 
 export default function Profile() {
-    const { user, isAuthenticated, logout } = useAuth();
-    const [marketListings, setNewMarketListings] = useState<MarketplaceItem[]>(
-        []
-    );
-    const [serviceListings, setNewServiceListings] = useState<Service[]>([]);
-    const navigate = useNavigate();
+  const {
+    user: currentUser,
+    isAuthenticated,
+    logout,
+    makeUserAdmin,
+  } = useAuth();
 
-    useEffect(() => {
-        const fetchListings = async () => {
-            const getlistings = await setListings();
-            const getServices = await setServiceListings();
-            setNewMarketListings(getlistings);
-            setNewServiceListings(getServices);
-        };
+  const [marketListings, setNewMarketListings] = useState<MarketplaceItem[]>([]);
+  const [serviceListings, setNewServiceListings] = useState<Service[]>([]);
+  const [userOrganizations, setUserOrganizations] = useState([]);
+  const [allOrganizations, setAllOrganizations] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
+  const [joinOrgOpen, setJoinOrgOpen] = useState(false);
+  const navigate = useNavigate();
 
-        fetchListings();
-    }, []);
-
-    // Redirect to login if not authenticated
-    if (!isAuthenticated) {
-        navigate("/login");
-        return null;
-    }
-
-    // Filter listings and services for this user
-    const userListings = marketListings.filter(
-        (item) => item.seller_id === user?.user_id
-    );
-    const userServices = serviceListings.filter(
-        (service) => service.provider_id === user?.user_id
-    );
-
-    const handleLogout = () => {
-        logout();
-        navigate("/");
+  useEffect(() => {
+    const fetchListings = async () => {
+      const getlistings = await setListings();
+      const getServices = await setServiceListings();
+      setNewMarketListings(getlistings);
+      setNewServiceListings(getServices);
     };
 
-    // Calculate account age
-    const accountAge = () => {
-        if (!user?.joinedAt) return "N/A";
+    fetchListings();
+  }, []);
 
-        const now = new Date();
-        const joinDate = new Date(user.joinedAt);
-        const diffTime = Math.abs(now.getTime() - joinDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 30) {
-            return `${diffDays} days`;
-        } else {
-            const diffMonths = Math.floor(diffDays / 30);
-            return `${diffMonths} ${diffMonths === 1 ? "month" : "months"}`;
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      if (currentUser?.user_id) {
+        const userOrgsResult = await supabaseCon.getUserOrganizations(currentUser.user_id);
+        if (userOrgsResult.success) {
+          setUserOrganizations(userOrgsResult.data || []);
         }
+
+        const allOrgsResult = await supabaseCon.getOrganizations();
+        if (allOrgsResult.success) {
+          setAllOrganizations(allOrgsResult.data || []);
+        }
+      }
     };
 
-    return (
-        <AppLayout title="Profile">
-            <div className="max-w-4xl mx-auto space-y-6">
-                {/* Profile Info Card */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                            <div className="relative">
-                                <div className="w-24 h-24 rounded-full bg-grambling-gray flex items-center justify-center overflow-hidden">
-                                    {user?.avatar ? (
-                                        <img
-                                            src={user.avatar}
-                                            alt={`${user.first_name} ${user.last_name}`}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <User className="w-12 h-12 text-grambling-black/50" />
-                                    )}
-                                </div>
-                                {user?.verified && (
-                                    <div className="absolute bottom-0 right-0 bg-grambling-gold text-grambling-black rounded-full p-1">
-                                        <VerifiedIcon className="h-4 w-4" />
-                                    </div>
-                                )}
-                            </div>
+    fetchOrganizations();
+  }, [currentUser]);
 
-                            <div className="text-center sm:text-left flex-1">
-                                <div className="flex items-center justify-center sm:justify-start">
-                                    <h1 className="text-xl font-semibold">
-                                        {user?.first_name} {user?.last_name}
-                                    </h1>
-                                    {user?.verified && (
-                                        <span className="ml-2 bg-grambling-gold/20 text-grambling-black text-xs px-2 py-1 rounded-full flex items-center">
-                                            <VerifiedIcon className="h-3 w-3 mr-1" />
-                                            Verified Student
-                                        </span>
-                                    )}
-                                </div>
+  if (!isAuthenticated) {
+    navigate("/login");
+    return null;
+  }
 
-                                <div className="flex items-center justify-center sm:justify-start mt-1">
-                                    <Star className="h-4 w-4 text-grambling-gold fill-grambling-gold" />
-                                    <span className="text-sm ml-1">
-                                        {user?.rating || "No ratings yet"}
-                                    </span>
-                                </div>
+  const userListings = marketListings.filter(
+    (item) => item.seller_id === currentUser?.user_id
+  );
+  const userServices = serviceListings.filter(
+    (service) => service.provider_id === currentUser?.user_id
+  );
 
-                                <div className="flex items-center justify-center sm:justify-start text-sm text-gray-500 mt-1">
-                                    <Clock className="h-4 w-4 mr-1" />
-                                    Member since {accountAge()}
-                                </div>
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
 
-                                {user?.bio && (
-                                    <p className="mt-2 text-sm text-gray-600">
-                                        {user.bio}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+  const accountAge = () => {
+    if (!currentUser?.joinedAt) return "N/A";
 
-                {/* Quick Actions */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <Link to="/marketplace/new">
-                        <Card className="h-24 tiger-card hover:border-grambling-gold transition-colors">
-                            <CardContent className="flex flex-col items-center justify-center h-full p-3">
-                                <ShoppingBag className="h-8 w-8 text-grambling-gold mb-1" />
-                                <span className="text-xs font-medium">
-                                    Sell Item
-                                </span>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                    <Link to="/services/new">
-                        <Card className="h-24 tiger-card hover:border-grambling-gold transition-colors">
-                            <CardContent className="flex flex-col items-center justify-center h-full p-3">
-                                <Briefcase className="h-8 w-8 text-grambling-gold mb-1" />
-                                <span className="text-xs font-medium">
-                                    Offer Service
-                                </span>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                    <Link to="/messages">
-                        <Card className="h-24 tiger-card hover:border-grambling-gold transition-colors">
-                            <CardContent className="flex flex-col items-center justify-center h-full p-3">
-                                <MessageSquare className="h-8 w-8 text-grambling-gold mb-1" />
-                                <span className="text-xs font-medium">
-                                    Messages
-                                </span>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                    <Link to="/settings">
-                        <Card className="h-24 tiger-card hover:border-grambling-gold transition-colors">
-                            <CardContent className="flex flex-col items-center justify-center h-full p-3">
-                                <Settings className="h-8 w-8 text-grambling-gold mb-1" />
-                                <span className="text-xs font-medium">
-                                    Settings
-                                </span>
-                            </CardContent>
-                        </Card>
-                    </Link>
+    const now = new Date();
+    const joinDate = new Date(currentUser.joinedAt);
+    const diffTime = Math.abs(now.getTime() - joinDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 30) {
+      return `${diffDays} days`;
+    } else {
+      const diffMonths = Math.floor(diffDays / 30);
+      return `${diffMonths} ${diffMonths === 1 ? "month" : "months"}`;
+    }
+  };
+
+  return (
+    <AppLayout title="Profile">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <OrderHistory />
+
+        <section>
+          <h2 className="text-xl font-semibold mb-4">My Organizations</h2>
+          <div className="flex gap-4 mb-4">
+            <Button onClick={() => setJoinOrgOpen(true)}>
+              <Users className="mr-2 h-4 w-4" /> Join Organization
+            </Button>
+            <Button onClick={() => setCreateOrgOpen(true)} variant="outline">
+              <Plus className="mr-2 h-4 w-4" /> Create Organization
+            </Button>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-4">My Listings</h2>
+          {userListings.length === 0 ? (
+            <p>No listings found.</p>
+          ) : (
+            <ul className="space-y-2">
+              {userListings.map((listing) => (
+                <li key={listing.id}>{listing.title}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-4">My Services</h2>
+          {userServices.length === 0 ? (
+            <p>No services found.</p>
+          ) : (
+            <ul className="space-y-2">
+              {userServices.map((service) => (
+                <li key={service.id}>{service.title}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {currentUser?.is_admin && (
+          <section className="mt-6">
+            <h2 className="text-xl font-bold mb-4">Admin Panel</h2>
+            <Tabs defaultValue="organizations">
+              <TabsList>
+                <TabsTrigger value="organizations">Pending Organizations</TabsTrigger>
+                <TabsTrigger value="members">Member Requests</TabsTrigger>
+              </TabsList>
+              <TabsContent value="organizations">
+                <AdminPendingOrganizations />
+              </TabsContent>
+              <TabsContent value="members">
+                <AdminPendingMembers />
+              </TabsContent>
+            </Tabs>
+          </section>
+        )}
+
+        {!currentUser?.is_admin && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="link"
+                className="mt-6 w-full text-xs text-gray-400 hover:text-gray-600"
+              >
+                Engineering team access
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Engineering Team Verification</DialogTitle>
+                <DialogDescription>
+                  Enter your engineering team code to get admin access
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const code = e.currentTarget.engineeringCode.value;
+                  makeUserAdmin(code);
+                }}
+              >
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="engineeringCode">Engineering Team Code</Label>
+                    <Input
+                      id="engineeringCode"
+                      name="engineeringCode"
+                      type="password"
+                      placeholder="Enter code"
+                      required
+                    />
+                    <p className="text-xs text-gray-500">
+                      This code is only available to the engineering team members
+                    </p>
+                  </div>
                 </div>
+                <DialogFooter>
+                  <Button type="submit">Verify & Activate</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
 
-                {/* Order History */}
-                <OrderHistory />
-
-                {/* Listings & Services */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Your Listings */}
-                    <div>
-                        <h2 className="text-xl font-semibold mb-4">
-                            Your Listings
-                        </h2>
-                        {userListings.length === 0 ? (
-                            <Card>
-                                <CardContent className="p-6">
-                                    <p className="text-center text-gray-500">
-                                        No listings yet
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <div className="space-y-3">
-                                {userListings.map((listing) => (
-                                    <Link
-                                        key={listing.id}
-                                        to={`/product/${listing.id}`}
-                                    >
-                                        <Card className="hover:border-grambling-gold transition-colors">
-                                            <CardContent className="p-4">
-                                                <h3 className="font-semibold">
-                                                    {listing.title}
-                                                </h3>
-                                                <p className="text-sm text-gray-500">
-                                                    ${listing.price}
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Your Services */}
-                    <div>
-                        <h2 className="text-xl font-semibold mb-4">
-                            Your Services
-                        </h2>
-                        {userServices.length === 0 ? (
-                            <Card>
-                                <CardContent className="p-6">
-                                    <p className="text-center text-gray-500">
-                                        No services yet
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <div className="space-y-3">
-                                {userServices.map((service) => (
-                                    <Link
-                                        key={service.id}
-                                        to={`/services/${service.id}`}
-                                    >
-                                        <Card className="hover:border-grambling-gold transition-colors">
-                                            <CardContent className="p-4">
-                                                <h3 className="font-semibold">
-                                                    {service.title}
-                                                </h3>
-                                                <p className="text-sm text-gray-500">
-                                                    ${service.rate}
-                                                    {service.rateType ===
-                                                    "hourly"
-                                                        ? "/hr"
-                                                        : ""}
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Logout Button */}
-                <div className="flex justify-center pt-6">
-                    <Button
-                        onClick={handleLogout}
-                        variant="outline"
-                        className="w-full max-w-xs"
-                    >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Logout
-                    </Button>
-                </div>
-            </div>
-        </AppLayout>
-    );
+        <div className="flex justify-center pt-6">
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            className="w-full max-w-xs"
+          >
+            <LogOut className="w-4 h-4 mr-2" /> Logout
+          </Button>
+        </div>
+      </div>
+    </AppLayout>
+  );
 }
