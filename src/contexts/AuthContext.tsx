@@ -12,7 +12,7 @@ import { supabaseCon } from "@/db_api/connection.js";
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
-  login: (studentId: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   register: (
     name: string,
     email: string,
@@ -22,7 +22,6 @@ interface AuthContextType {
   logout: () => void;
   verifyAccount: () => Promise<boolean>;
   makeUserAdmin: (engineeringCode: string) => Promise<boolean>;
-  updateLocalUser: (updates: Partial<User>) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,7 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const { toast } = useToast();
 
-  // Check if user is already logged in
   useEffect(() => {
     const storedUser = localStorage.getItem("tigerUser");
     if (storedUser) {
@@ -47,15 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = async (
-    email: string, // change to email for login because there was no way to securely login without exposing the db to the public
-    password: string
-  ): Promise<boolean> => {
-    // Simulate API call
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const user = await supabaseCon.login(email, password); // Returns a user object with success and data properties
-
-      // If the login was successful, set the user in state and localStorage
+      const user = await supabaseCon.login(email, password);
       if (user.success) {
         setCurrentUser(user.data);
         setIsAuthenticated(true);
@@ -77,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Login error", error);
       toast({
         title: "Login Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
       return false;
@@ -90,53 +82,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     studentId: string,
     password: string
   ): Promise<boolean> => {
-    // Simulate API call
     try {
-      // Check if user already exists
-      const existingUser = await supabaseCon.userExists(studentId);
-
-      // If an error occurred while checking for existing user, show error message
-      if (existingUser.error) {
-        toast({
-          title: "Registration Failed",
-          description: "Please try again later",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      // If user already exists, message stating that the user already exists
-      if (existingUser.exists) {
-        toast({
-          title: "Registration Failed",
-          description: "Student ID or email already in use",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      // Simple split to split the full name into first and last names
-      const parts = name.split(/\s+/);
-
-      // Call SupabaseDbConnection's signup method
+      const [firstName, ...lastNameParts] = name.split(" ");
+      const lastName = lastNameParts.join(" ");
       const signupResult = await supabaseCon.signup(
-        parts[0],
-        parts[1],
+        firstName,
+        lastName,
         email,
         studentId,
         password
       );
 
-      if (!signupResult.success) {
-        toast({
-          title: "Registration Failed",
-          description: signupResult.error || "An unexpected error occurred.",
-          variant: "destructive",
-        });
-        return false;
-      }
+      if (!signupResult.success) return false;
 
-      // Create new user
       const newUser: User = {
         user_id: signupResult.data.user_id,
         first_name: signupResult.data.first_name,
@@ -148,15 +106,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         joinedAt: signupResult.data.joinedAt,
       };
 
-      // Auto-login the new user
       setCurrentUser(newUser);
       setIsAuthenticated(true);
       localStorage.setItem("tigerUser", JSON.stringify(newUser));
 
       toast({
         title: "Registration Successful",
-        description:
-          "Your account has been created. Please verify your student ID.",
+        description: "Your account has been created. Please verify your student ID.",
       });
 
       return true;
@@ -172,20 +128,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const verifyAccount = async (): Promise<boolean> => {
-    // Simulate API call for verification
     try {
       if (!currentUser) return false;
-
-      // In a real app, this would call your verification API
       const updatedUser = { ...currentUser, verified: true };
       setCurrentUser(updatedUser);
       localStorage.setItem("tigerUser", JSON.stringify(updatedUser));
-
       toast({
         title: "Verification Successful",
         description: "Your student ID has been verified!",
       });
-
       return true;
     } catch (error) {
       console.error("Verification error", error);
@@ -200,11 +151,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     const logoutResult = await supabaseCon.logout();
-
-    // Even if logout fails server-side, we'll clear locally for better UX
     setCurrentUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem("tigerUser");
+    toast({
+      title: "Logged Out",
+      description: "You have been successfully logged out.",
+    });
   };
 
   const makeUserAdmin = async (engineeringCode: string): Promise<boolean> => {
@@ -218,8 +171,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      // Validate the engineering team code
-      // In a real app, this would be more secure, but for this example we use a simple code
       if (engineeringCode !== "TigerConnect2024") {
         toast({
           title: "Invalid Code",
@@ -229,15 +180,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      // Make the user an admin in the database
       const result = await supabaseCon.makeUserAdmin(currentUser.user_id);
 
       if (result.success) {
-        // Update the local user state
         const updatedUser = { ...currentUser, is_admin: true };
         setCurrentUser(updatedUser);
         localStorage.setItem("tigerUser", JSON.stringify(updatedUser));
-
         toast({
           title: "Admin Access Granted",
           description: "You now have administrator privileges",
@@ -262,25 +210,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateLocalUser = (updates: Partial<User>) => {
-    console.log("Updating local user:", updates);
-    if (!currentUser) {
-      console.warn("Cannot update user - no current user");
-      return false;
-    }
-
-    try {
-      const updatedUser = { ...currentUser, ...updates };
-      setCurrentUser(updatedUser);
-      localStorage.setItem("tigerUser", JSON.stringify(updatedUser));
-      console.log(updatedUser);
-      return true;
-    } catch (error) {
-      console.error("Failed to update local user:", error);
-      return false;
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -291,7 +220,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         verifyAccount,
         makeUserAdmin,
-        updateLocalUser,
       }}
     >
       {children}

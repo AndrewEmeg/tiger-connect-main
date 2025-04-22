@@ -8,7 +8,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { supabaseCon } from "@/db_api/connection.js"; // adjust path accordingly
+import { supabaseCon } from "@/db_api/connection.js";
 import {
   Form,
   FormControl,
@@ -50,10 +50,10 @@ const formSchema = z.object({
 
 export default function MarketplaceNew() {
   const navigate = useNavigate();
-  const { currentUser, isAuthenticated } = useAuth();
+  const { user: currentUser, isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canSell, setCanSell] = useState(false);
 
-  // ✅ Always call hooks first
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -66,19 +66,30 @@ export default function MarketplaceNew() {
     },
   });
 
-  // ✅ Handle redirect as a side effect
   useEffect(() => {
     if (!isAuthenticated) {
       navigate("/login", { replace: true });
+      return;
     }
-  }, [isAuthenticated, navigate]);
 
-  if (!isAuthenticated) return null;
+    const checkSeller = async () => {
+      try {
+        const res = await supabaseCon.checkSellerStatus(currentUser?.user_id);
+        setCanSell(res ?? false);
+      } catch (error) {
+        console.error("Error checking seller status:", error);
+        toast.error("Failed to verify seller status");
+      }
+    };
+
+    checkSeller();
+  }, [isAuthenticated, navigate, currentUser]);
+
+  if (!isAuthenticated || !canSell) return null;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      // First attempt to list the item
       const listingResult = await supabaseCon.listItemsToMarketPlace(
         values.title,
         values.description,
@@ -89,7 +100,6 @@ export default function MarketplaceNew() {
         values.images
       );
 
-      // Check if the listing was successful
       if (!listingResult.success) {
         console.error("Listing failed:", listingResult.error);
         toast.error("Failed to list item: " + listingResult.error);
@@ -97,59 +107,50 @@ export default function MarketplaceNew() {
         return;
       }
 
-      console.log("Listing successful, data:", listingResult.data);
-      
-      // Only try to create notification if the listing was successful
-      try {
-        // Get the item ID from the response
-        let itemId;
-        
-        if (Array.isArray(listingResult.data) && listingResult.data.length > 0) {
-          itemId = listingResult.data[0]?.id;
-          console.log("Found item ID from array:", itemId);
-        } else if (listingResult.data && typeof listingResult.data === 'object') {
+      let itemId: string | undefined;
+      if (listingResult.data) {
+        if (
+          Array.isArray(listingResult.data) &&
+          listingResult.data.length > 0 &&
+          typeof listingResult.data[0]?.id === "string"
+        ) {
+          itemId = listingResult.data[0].id;
+        } else if (
+          typeof listingResult.data === "object" &&
+          typeof listingResult.data.id === "string"
+        ) {
           itemId = listingResult.data.id;
-          console.log("Found item ID from object:", itemId);
-        } else {
-          console.log("Data returned:", JSON.stringify(listingResult.data));
         }
-          
-        if (itemId) {
-          console.log(`Creating notification for item ID: ${itemId} and user ID: ${currentUser?.user_id}`);
-          const notificationResult = await supabaseCon.createNewListingNotification(
-            currentUser?.user_id,
-            itemId,
-            values.title
-          );
-          
-          if (notificationResult.success) {
-            console.log("Notification created successfully");
-          } else {
-            console.error("Notification creation failed:", notificationResult.error);
-          }
-        } else {
-          console.warn("Item ID not found in response, skipping notification creation");
-        }
-      } catch (notificationError) {
-        // If notification creation fails, just log it but don't fail the whole operation
-        console.error("Error creating notification:", notificationError);
       }
 
-      // Always show success message and redirect even if notification fails
+      if (itemId) {
+        try {
+          const notificationResult =
+            await supabaseCon.createNewListingNotification(
+              currentUser?.user_id,
+              itemId,
+              values.title
+            );
+
+          if (!notificationResult.success) {
+            console.error("Notification creation failed:", notificationResult.error);
+          }
+        } catch (notificationError) {
+          console.error("Error creating notification:", notificationError);
+        }
+      }
+
       toast.success("Your item has been successfully listed on the marketplace!");
 
-      // Force a refresh of notifications before navigation
       try {
-        // This will fire an event that the app-header listens for
-        const refreshEvent = new CustomEvent('refreshNotifications');
+        const refreshEvent = new CustomEvent("refreshNotifications");
         window.dispatchEvent(refreshEvent);
       } catch (e) {
         console.error("Failed to trigger notification refresh:", e);
       }
 
-      // Navigate to marketplace after a slight delay to allow notifications to be created
       setTimeout(() => {
-      navigate("/marketplace");
+        navigate("/marketplace");
       }, 300);
     } catch (error) {
       console.error("Error submitting form:", error);
@@ -162,7 +163,11 @@ export default function MarketplaceNew() {
   return (
     <AppLayout title="List Item for Sale">
       <div className="mb-4">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="pl-0">
+        <Button
+          variant="ghost"
+          onClick={() => navigate(-1)}
+          className="pl-0"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
