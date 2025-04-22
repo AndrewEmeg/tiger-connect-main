@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import toast from "react-hot-toast";
 
 export default function OrderHistory() {
-    const { user } = useAuth();
+    const { currentUser } = useAuth();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -13,18 +13,21 @@ export default function OrderHistory() {
     const [comment, setComment] = useState("");
 
     const loadOrders = useCallback(async () => {
-        if (!user?.user_id) {
-            console.log("No user ID found:", user);
+        if (!currentUser?.user_id) {
+            console.log("No user ID found:", currentUser);
             return;
         }
 
-        console.log("Attempting to fetch orders for user_id:", user.user_id);
+        console.log(
+            "Attempting to fetch orders for user_id:",
+            currentUser.user_id
+        );
         setLoading(true);
 
         const { data, error } = await supabase
             .from("orders")
             .select("*")
-            .eq("user_id", user.user_id)
+            .eq("user_id", currentUser.user_id)
             .order("created_at", { ascending: false });
 
         if (error) {
@@ -40,7 +43,7 @@ export default function OrderHistory() {
         }
 
         setLoading(false);
-    }, [user?.user_id]);
+    }, [currentUser?.user_id]);
 
     useEffect(() => {
         const checkAuthAndLoadOrders = async () => {
@@ -48,9 +51,9 @@ export default function OrderHistory() {
                 data: { session },
             } = await supabase.auth.getSession();
             console.log("Current auth session:", session?.user?.id);
-            console.log("Component user_id:", user?.user_id);
+            console.log("Component user_id:", currentUser?.user_id);
 
-            if (session?.user?.id !== user?.user_id) {
+            if (session?.user?.id !== currentUser?.user_id) {
                 console.warn("Auth session and user ID mismatch!");
             }
 
@@ -62,11 +65,11 @@ export default function OrderHistory() {
 
     const handleReviewSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedOrder || !user) return;
+        if (!selectedOrder || !currentUser) return;
 
         const { error } = await supabase.from("reviews").insert({
             order_id: selectedOrder.id,
-            user_id: user.user_id,
+            user_id: currentUser.user_id,
             rating,
             comment,
         });

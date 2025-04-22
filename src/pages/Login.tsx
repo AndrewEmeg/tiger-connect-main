@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 
 export default function Login() {
-    const [studentId, setStudentId] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const { login } = useAuth();
@@ -24,7 +24,7 @@ export default function Login() {
         setIsLoading(true);
 
         try {
-            const success = await login(studentId, password);
+            const success = await login(email, password);
             if (success) {
                 navigate("/");
             }
@@ -49,26 +49,24 @@ export default function Login() {
                     <CardHeader>
                         <CardTitle>Sign In</CardTitle>
                         <CardDescription>
-                            Enter your student ID and password to access your
-                            account
+                            Enter your email and password to access your account
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
                                 <label
-                                    htmlFor="studentId"
+                                    htmlFor="email"
                                     className="text-sm font-medium"
                                 >
                                     Email
                                 </label>
                                 <Input
-                                    id="studentId"
+                                    id="email"
+                                    type="email"
                                     placeholder="Enter your school email"
-                                    value={studentId}
-                                    onChange={(e) =>
-                                        setStudentId(e.target.value)
-                                    }
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     required
                                     className="tiger-input"
                                 />
@@ -123,8 +121,7 @@ export default function Login() {
                 </Card>
 
                 <div className="mt-4 text-center text-xs text-gray-500">
-                    For demo purposes, use any student ID from the mock data
-                    (e.g., G00123456) with password "password"
+                    For demo purposes, use your school email and password
                 </div>
             </div>
         </div>

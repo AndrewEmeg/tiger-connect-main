@@ -9,6 +9,7 @@ import { User } from "@/models/User";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Reviews } from "@/components/Reviews";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Review {
     id: number;
@@ -19,7 +20,8 @@ interface Review {
 }
 
 const ProductDetail = () => {
-    const { id } = useParams();
+    const { id } = useParams<{ id: string }>();
+    const { currentUser } = useAuth();
     const navigate = useNavigate();
     const { toast } = useToast();
     const [quantity, setQuantity] = useState(1);
@@ -69,12 +71,31 @@ const ProductDetail = () => {
         navigate("/checkout");
     };
 
+    const handleMessageSeller = () => {
+        if (!currentUser) {
+            toast({
+                variant: "destructive",
+                description: "Please log in to message the seller",
+            });
+            navigate("/login");
+            return;
+        }
+        navigate(`/messages/${product?.seller_id}`);
+    };
+
     const handleAddToCart = () => {
+        if (!currentUser) {
+            toast({
+                variant: "destructive",
+                description: "Please log in to add items to cart",
+            });
+            navigate("/login");
+            return;
+        }
         if (!product) return;
         addToCart(product, quantity);
         toast({
-            title: "Added to cart",
-            description: `${quantity} ${product.title} added to your cart.`,
+            description: "Added to cart successfully",
         });
     };
 
@@ -146,11 +167,7 @@ const ProductDetail = () => {
                                 <Button
                                     variant="link"
                                     className="text-grambling-gold p-0"
-                                    onClick={() =>
-                                        navigate(
-                                            `/messages/${product.seller_id}`
-                                        )
-                                    }
+                                    onClick={handleMessageSeller}
                                 >
                                     Message Seller
                                 </Button>

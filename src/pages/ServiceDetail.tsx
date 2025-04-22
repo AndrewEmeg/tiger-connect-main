@@ -26,9 +26,9 @@ interface ServiceData {
 }
 
 export default function ServiceDetail() {
-    const { id } = useParams();
+    const { id } = useParams<{ id: string }>();
+    const { currentUser } = useAuth();
     const navigate = useNavigate();
-    const { user } = useAuth();
     const [service, setService] = useState<ServiceData | null>(null);
     const [providerName, setProviderName] = useState("");
     const [loading, setLoading] = useState(true);
@@ -95,7 +95,7 @@ export default function ServiceDetail() {
     }, [id]);
 
     const handleMessageProvider = () => {
-        if (!user) {
+        if (!currentUser) {
             toast.error("Please log in to message the provider");
             navigate("/login");
             return;

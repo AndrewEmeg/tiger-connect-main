@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { User } from "@/models/User";
 import { useToast } from "@/hooks/use-toast";
-import { supabaseCon } from "@/db_api/connection.js";
+import { supabaseCon } from "@/db_api/connection";
 
 interface AuthContextType {
     currentUser: User | null;
@@ -24,7 +24,9 @@ interface AuthContextType {
     makeUserAdmin: (engineeringCode: string) => Promise<boolean>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+    undefined
+);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -47,20 +49,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (email: string, password: string): Promise<boolean> => {
         try {
-            const user = await supabaseCon.login(email, password);
-            if (user.success) {
-                setCurrentUser(user.data);
+            const result = await supabaseCon.login(email, password);
+            if (result.success && result.data) {
+                setCurrentUser(result.data);
                 setIsAuthenticated(true);
-                localStorage.setItem("tigerUser", JSON.stringify(user.data));
+                localStorage.setItem("tigerUser", JSON.stringify(result.data));
                 toast({
                     title: "Login Successful",
-                    description: `Welcome back, ${user.data.first_name}!`,
+                    description: `Welcome back, ${result.data.first_name}!`,
                 });
                 return true;
             } else {
                 toast({
                     title: "Login Failed",
-                    description: "Invalid email or password",
+                    description: result.error || "Invalid email or password",
                     variant: "destructive",
                 });
                 return false;
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const [firstName, ...lastNameParts] = name.split(" ");
             const lastName = lastNameParts.join(" ");
-            const signupResult = await supabaseCon.signup(
+            const result = await supabaseCon.signup(
                 firstName,
                 lastName,
                 email,
@@ -93,30 +95,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 password
             );
 
-            if (!signupResult.success) return false;
-
-            const newUser: User = {
-                user_id: signupResult.data.user_id,
-                first_name: signupResult.data.first_name,
-                last_name: signupResult.data.last_name,
-                email: signupResult.data.email,
-                g_number: signupResult.data.g_number,
-                rating: null,
-                verified: signupResult.data.verified,
-                joinedAt: signupResult.data.joinedAt,
-            };
-
-            setCurrentUser(newUser);
-            setIsAuthenticated(true);
-            localStorage.setItem("tigerUser", JSON.stringify(newUser));
-
-            toast({
-                title: "Registration Successful",
-                description:
-                    "Your account has been created. Please verify your student ID.",
-            });
-
-            return true;
+            if (result.success && result.data) {
+                setCurrentUser(result.data);
+                setIsAuthenticated(true);
+                localStorage.setItem("tigerUser", JSON.stringify(result.data));
+                toast({
+                    title: "Registration Successful",
+                    description:
+                        "Your account has been created. Please verify your student ID.",
+                });
+                return true;
+            } else {
+                toast({
+                    title: "Registration Error",
+                    description: result.error || "An unexpected error occurred",
+                    variant: "destructive",
+                });
+                return false;
+            }
         } catch (error) {
             console.error("Registration error", error);
             toast({
@@ -151,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = async () => {
-        const logoutResult = await supabaseCon.logout();
+        const result = await supabaseCon.logout();
         setCurrentUser(null);
         setIsAuthenticated(false);
         localStorage.removeItem("tigerUser");
